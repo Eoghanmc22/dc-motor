@@ -4,7 +4,7 @@ use embassy_rp::{
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 
-use crate::adc;
+use crate::current;
 
 pub static MOTOR_CONTROLLERS: Mutex<CriticalSectionRawMutex, Option<[Drv8874; 4]>> =
     Mutex::new(None);
@@ -16,6 +16,7 @@ pub struct Drv8874 {
     enable: Output<'static>,
     fault: Input<'static>,
 
+    last_speed: f32,
     armed: bool,
 }
 
@@ -36,12 +37,15 @@ impl Drv8874 {
             enable: Output::new(enable.into(), Level::Low),
             fault: Input::new(fault.into(), Pull::None),
             armed: false,
+            last_speed: 0.0,
         }
     }
 
     pub fn set_speed(&mut self, speed: f32) {
         if !self.armed {
             let _ = self.pwm.set_duty_cycle_fully_off();
+            self.last_speed = 0.0;
+            return;
         }
         self.set_armed(self.armed);
 
@@ -49,9 +53,16 @@ impl Drv8874 {
 
         self.phase.set_level((speed >= 0.0).into());
         let _ = self.pwm.set_duty_cycle(duty as u16);
+
+        self.last_speed = speed;
     }
 
     pub fn set_armed(&mut self, armed: bool) {
+        if armed != self.armed {
+            let _ = self.pwm.set_duty_cycle_fully_off();
+            self.last_speed = 0.0;
+        }
+
         self.enable.set_level(armed.into());
         self.armed = armed;
     }
@@ -69,8 +80,12 @@ impl Drv8874 {
         self.motor_id
     }
 
+    pub fn last_speed(&self) -> f32 {
+        self.last_speed
+    }
+
     pub fn current_draw(&self) -> f32 {
-        adc::ADC_WATCHES[self.motor_id as usize]
+        current::ADC_WATCHES[self.motor_id as usize]
             .try_get()
             .unwrap_or(-1.0)
     }

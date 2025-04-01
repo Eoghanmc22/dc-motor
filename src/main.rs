@@ -5,33 +5,36 @@
 #![no_std]
 #![no_main]
 
-pub mod adc;
+pub mod current;
 pub mod motor_controller;
 pub mod safety_watchdog;
-pub mod usb;
+pub mod serial;
 
 use defmt::{info, unwrap};
 use embassy_executor::Spawner;
-use embassy_rp::adc::InterruptHandler as InterruptHandlerADC;
-use embassy_rp::bind_interrupts;
-use embassy_rp::peripherals::USB;
-use embassy_rp::usb::InterruptHandler as InterruptHandlerUSB;
+use embassy_rp::peripherals::{I2C1, UART0, USB};
+use embassy_rp::{adc, uart, usb};
+use embassy_rp::{bind_interrupts, i2c};
 use motor_controller::Drv8874;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
-    USBCTRL_IRQ => InterruptHandlerUSB<USB>;
-    ADC_IRQ_FIFO => InterruptHandlerADC;
+    USBCTRL_IRQ => usb::InterruptHandler<USB>;
+    UART0_IRQ => uart::BufferedInterruptHandler<UART0>;
+    ADC_IRQ_FIFO => adc::InterruptHandler;
+    I2C1_IRQ => i2c::InterruptHandler<I2C1>;
+
+
 });
 
-// pub struct Ctx {
-//     spawner: Spawner,
-//
-// }
+// TODO:
+// Look into what mutex impl we should be using
+// Make buffer sizes more appropriate
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    info!("Hello from Rust!");
+    info!("Starting DC Motor controller");
+
     let p = embassy_rp::init(Default::default());
 
     // Configure global for motor controllers
@@ -48,8 +51,10 @@ async fn main(spawner: Spawner) {
     }
 
     unwrap!(spawner.spawn(safety_watchdog::start_safety_watch_dog()));
-    unwrap!(spawner.spawn(usb::start_usb(spawner, p.USB)));
-    unwrap!(spawner.spawn(adc::start_adc_dma(
+    unwrap!(spawner.spawn(serial::usb::start_usb(spawner, p.USB)));
+    unwrap!(spawner.spawn(serial::uart::start_uart(spawner, p.UART0, p.PIN_0, p.PIN_1)));
+    unwrap!(spawner.spawn(serial::i2c::start_i2c(spawner, p.I2C1, p.PIN_19, p.PIN_18)));
+    unwrap!(spawner.spawn(current::start_adc_dma(
         spawner, p.ADC, p.DMA_CH0, p.PIN_26, p.PIN_27, p.PIN_28, p.PIN_29
     )));
 }

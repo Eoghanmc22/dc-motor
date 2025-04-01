@@ -6,33 +6,36 @@ Expose the functional of the motor controllers over USB, UART, and SPI
 - Report fault status
 - Report current draw
 
-## SPI
+## I2C
 
 Command Format:
 Command id
 Request body
-CRC
 Status
 Response body
-CRC
 
 Commands:
 
 - Set Speed (0):
   - Request:
-    - Motor id (1 byte)
+    - Motor id bitset (1 byte)
     - Motor speed (2 bytes)
   - Response:
-    - Current Draw (2 bytes)
+    - length prefixed array (u8)
+      - motor id (u8)
+      - Current Draw (2 bytes)
+      - is_fault (bool)
 - Read Motor (1):
   - Request
-    - Motor id (1 byte)
+    - Motor id bitset (1 byte)
   - Response
-    - Motor speed (2 bytes)
-    - Current Draw (2 bytes)
+    - length prefixed array (u8)
+      - motor id (u8)
+      - Motor speed (2 bytes)
+      - Current Draw (2 bytes)
+      - is_fault (bool)
 - Arm
   - Enable for millis (2 byte)
-- Software Reset (3)
 
 Status:
 OK (0)
@@ -60,7 +63,7 @@ Streaming can be stopped by setting interval to zero
 
 Payload:
 
-- Motor id (u8)
+- Motor id bitset (u8)
 - Motor speed (u16)
 
 #### Ping
@@ -82,11 +85,9 @@ Payload:
 
 Enables motor outputs for the specified number of milliseconds
 
-#### SoftwareReset
-
 ### From Motor Controller
 
-#### Motor State
+#### MotorState
 
 Payload:
 
