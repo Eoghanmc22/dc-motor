@@ -31,7 +31,6 @@ impl Drv8874 {
     ) -> Self {
         Self {
             motor_id,
-            // TODO: is the default config appropriate?
             pwm: Pwm::new_output_a(slice, pwm, Config::default()),
             phase: Output::new(phase.into(), Level::Low),
             enable: Output::new(enable.into(), Level::Low),

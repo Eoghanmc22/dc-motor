@@ -2,11 +2,11 @@ use embassy_futures::select::{Either, select};
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal,
 };
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Instant, Timer};
 
 use crate::{motor_controller, safety_watchdog};
 
-use super::{
+use interface::{
     CurrentDraw, Motors, Speed,
     from_motor_controller::{self, MotorState, Pong},
     to_motor_controller,
@@ -67,13 +67,14 @@ pub async fn handle_inbound_packet(ctx: &HandlerCtx, packet: to_motor_controller
     }
 }
 
-#[embassy_executor::task]
+#[embassy_executor::task(pool_size = 2)]
 pub async fn stream_motor_data(ctx: &'static HandlerCtx) {
     let mut config = (Motors::empty(), Duration::MAX);
 
     loop {
         let new_config_fut = ctx.streams.wait();
-        let interval_fut = Timer::after(config.1);
+        // let interval_fut = Timer::after(config.1);
+        let interval_fut = Timer::at(Instant::now().checked_add(config.1).unwrap_or(Instant::MAX));
 
         let select = select(new_config_fut, interval_fut).await;
         match select {

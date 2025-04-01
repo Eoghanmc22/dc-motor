@@ -3,15 +3,14 @@ use embassy_executor::Spawner;
 use embassy_rp::peripherals::{PIN_0, PIN_1, UART0};
 use embassy_rp::uart::{BufferedUart, BufferedUartRx, BufferedUartTx, Config};
 use embedded_io_async::{Read, Write};
+use interface::decoder::{FeedResult, PackerDecoder};
+use interface::encoder::encode_packet;
+use interface::from_motor_controller;
 use static_cell::StaticCell;
 
 use crate::Irqs;
-use crate::serial::decoder::FeedResult;
-use crate::serial::encoder::encode_packet;
-use crate::serial::from_motor_controller;
 use crate::serial::handler::{self, stream_motor_data};
 
-use super::decoder::PackerDecoder;
 use super::handler::HandlerCtx;
 
 static UART_CTX: HandlerCtx = HandlerCtx::new();

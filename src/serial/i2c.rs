@@ -9,11 +9,8 @@ use num_enum::FromPrimitive;
 
 use crate::{Irqs, motor_controller};
 
-use super::{
-    CurrentDraw, Interval, Motors, Speed,
-    handler::{HandlerCtx, handle_inbound_packet},
-    to_motor_controller,
-};
+use super::handler::{HandlerCtx, handle_inbound_packet};
+use interface::{CurrentDraw, Interval, Motors, Speed, to_motor_controller};
 
 #[embassy_executor::task]
 pub async fn start_i2c(spawner: Spawner, i2c: I2C1, sda: PIN_19, scl: PIN_18) {

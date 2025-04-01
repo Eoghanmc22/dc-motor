@@ -762,6 +762,7 @@ dependencies = [
  "embedded-io-async",
  "embedded-storage",
  "heapless 0.8.0",
+ "interface",
  "num_enum",
  "panic-probe",
  "portable-atomic",
@@ -926,6 +927,18 @@ checksum = "3954d50fe15b02142bf25d3b8bdadb634ec3948f103d04ffe3031bc8fe9d7058"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.2",
+]
+
+[[package]]
+name = "interface"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.9.0",
+ "cobs 0.3.0",
+ "crc",
+ "embassy-time",
+ "postcard",
+ "serde",
 ]
 
 [[package]]

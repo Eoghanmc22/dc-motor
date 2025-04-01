@@ -94,6 +94,8 @@ num_enum = { version = "0.7.3", default-features = false }
 # rand = { version = "0.9", default-features = false }
 # embedded-sdmmc = "0.8"
 
+interface = { path = "../dc-motor-interface", default-features = false }
+
 [profile.release]
 debug = 2
 lto = true

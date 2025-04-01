@@ -4,16 +4,13 @@ use embassy_rp::peripherals::USB;
 use embassy_rp::usb::Driver;
 use embassy_usb::UsbDevice;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, Receiver, Sender, State};
+use interface::decoder::{FeedResult, PackerDecoder};
+use interface::encoder::encode_packet;
+use interface::from_motor_controller;
 use static_cell::StaticCell;
 
 use crate::Irqs;
-use crate::serial::decoder::FeedResult;
-use crate::serial::encoder::encode_packet;
-use crate::serial::from_motor_controller;
-use crate::serial::handler::{self, stream_motor_data};
-
-use super::decoder::PackerDecoder;
-use super::handler::HandlerCtx;
+use crate::serial::handler::{self, HandlerCtx, stream_motor_data};
 
 static USB_CTX: HandlerCtx = HandlerCtx::new();
 
