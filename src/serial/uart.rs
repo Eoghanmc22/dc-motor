@@ -3,15 +3,14 @@ use embassy_executor::Spawner;
 use embassy_rp::peripherals::{PIN_0, PIN_1, UART0};
 use embassy_rp::uart::{BufferedUart, BufferedUartRx, BufferedUartTx, Config};
 use embedded_io_async::{Read, Write};
-use interface::decoder::{FeedResult, PackerDecoder};
+use interface::decoder::PackerDecoder;
 use interface::encoder::encode_packet;
-use interface::from_motor_controller;
 use static_cell::StaticCell;
 
 use crate::Irqs;
-use crate::serial::handler::{self, stream_motor_data};
+use crate::serial::handler::stream_motor_data;
 
-use super::handler::HandlerCtx;
+use super::handler::{HandlerCtx, feed_all_and_handle};
 
 static UART_CTX: HandlerCtx = HandlerCtx::new();
 
@@ -80,40 +79,6 @@ async fn uart_read_half(mut receiver: BufferedUartRx<'static, UART0>) {
             }
         };
 
-        let mut data = &buf[..n];
-
-        while !data.is_empty() {
-            let rst = decoder.feed(data);
-            match rst {
-                FeedResult::Consumed => {
-                    data = &[];
-                }
-                FeedResult::OverFull(remaining) => {
-                    UART_CTX
-                        .packets
-                        .send(from_motor_controller::Packet::Error(
-                            from_motor_controller::Error::DecodingBufferOverflow,
-                        ))
-                        .await;
-                    data = remaining;
-                }
-                FeedResult::DeserError(remaining) => {
-                    UART_CTX
-                        .packets
-                        .send(from_motor_controller::Packet::Error(
-                            from_motor_controller::Error::DecodingError,
-                        ))
-                        .await;
-                    data = remaining;
-                }
-                FeedResult::Success {
-                    data: packet,
-                    remaining,
-                } => {
-                    handler::handle_inbound_packet(&UART_CTX, packet).await;
-                    data = remaining;
-                }
-            }
-        }
+        feed_all_and_handle(&buf[..n], &mut decoder, &UART_CTX).await;
     }
 }

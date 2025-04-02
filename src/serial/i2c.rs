@@ -10,7 +10,7 @@ use num_enum::FromPrimitive;
 use crate::{Irqs, motor_controller};
 
 use super::handler::{HandlerCtx, handle_inbound_packet};
-use interface::{CurrentDraw, Interval, Motors, Speed, to_motor_controller};
+use interface::{CurrentDraw, Interval, Motors, Speed, h2c};
 
 #[embassy_executor::task]
 pub async fn start_i2c(spawner: Spawner, i2c: I2C1, sda: PIN_19, scl: PIN_18) {
@@ -72,14 +72,7 @@ async fn handle_message<Out: BufMut>(mut msg: impl Buf, mut response: Out) -> Ou
             let motors = Motors::from_bits_truncate(msg.get_u8());
             let speed = Speed(msg.get_i16());
 
-            handle_inbound_packet(
-                &HandlerCtx::new(),
-                to_motor_controller::Packet::SetSpeed(to_motor_controller::SetSpeed {
-                    motors,
-                    speed,
-                }),
-            )
-            .await;
+            handle_inbound_packet(&HandlerCtx::new(), h2c::SetSpeed { motors, speed }).await;
 
             let mut motor_controllers = motor_controller::MOTOR_CONTROLLERS.lock().await;
             if let Some(motor_controllers) = &mut *motor_controllers {
@@ -123,19 +116,9 @@ async fn handle_message<Out: BufMut>(mut msg: impl Buf, mut response: Out) -> Ou
             let duration = Interval(msg.get_u16());
 
             if duration.0 > 0 {
-                handle_inbound_packet(
-                    &HandlerCtx::new(),
-                    to_motor_controller::Packet::SetArmed(to_motor_controller::SetArmed::Armed {
-                        duration,
-                    }),
-                )
-                .await;
+                handle_inbound_packet(&HandlerCtx::new(), h2c::SetArmed::Armed { duration }).await;
             } else {
-                handle_inbound_packet(
-                    &HandlerCtx::new(),
-                    to_motor_controller::Packet::SetArmed(to_motor_controller::SetArmed::Disarmed),
-                )
-                .await;
+                handle_inbound_packet(&HandlerCtx::new(), h2c::SetArmed::Disarmed).await;
             }
         }
         PacketsI2c::Unknown(id) => {

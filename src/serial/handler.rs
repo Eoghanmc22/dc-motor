@@ -8,12 +8,13 @@ use crate::{motor_controller, safety_watchdog};
 
 use interface::{
     CurrentDraw, Motors, Speed,
-    from_motor_controller::{self, MotorState, Pong},
-    to_motor_controller,
+    c2h::{self, PacketC2H},
+    decoder::{FeedResult, PackerDecoder},
+    h2c::{self, PacketH2C},
 };
 
 pub struct HandlerCtx {
-    pub packets: Channel<CriticalSectionRawMutex, from_motor_controller::Packet, 8>,
+    pub packets: Channel<CriticalSectionRawMutex, PacketC2H, 8>,
     pub streams: Signal<CriticalSectionRawMutex, (Motors, Duration)>,
 }
 
@@ -32,13 +33,45 @@ impl Default for HandlerCtx {
     }
 }
 
-pub async fn handle_inbound_packet(ctx: &HandlerCtx, packet: to_motor_controller::Packet) {
-    match packet {
-        to_motor_controller::Packet::StartStream(start_stream) => {
+pub async fn feed_all_and_handle<const N: usize>(
+    mut data: &[u8],
+    decoder: &mut PackerDecoder<N>,
+    ctx: &HandlerCtx,
+) {
+    while !data.is_empty() {
+        let rst = decoder.feed::<PacketH2C>(data);
+        match rst {
+            FeedResult::Consumed => {
+                data = &[];
+            }
+            FeedResult::OverFull(remaining) => {
+                ctx.packets
+                    .send(c2h::Error::DecodingBufferOverflow.into())
+                    .await;
+                data = remaining;
+            }
+            FeedResult::DeserError(remaining) => {
+                ctx.packets.send(c2h::Error::DecodingError.into()).await;
+                data = remaining;
+            }
+            FeedResult::Success {
+                data: packet,
+                remaining,
+            } => {
+                handle_inbound_packet(ctx, packet).await;
+                data = remaining;
+            }
+        }
+    }
+}
+
+pub async fn handle_inbound_packet(ctx: &HandlerCtx, packet: impl Into<PacketH2C>) {
+    match packet.into() {
+        PacketH2C::StartStream(start_stream) => {
             ctx.streams
                 .signal((start_stream.motors, start_stream.interval.as_duration()));
         }
-        to_motor_controller::Packet::SetSpeed(set_speed) => {
+        PacketH2C::SetSpeed(set_speed) => {
             let mut motor_controllers = motor_controller::MOTOR_CONTROLLERS.lock().await;
             let Some(motor_controllers) = &mut *motor_controllers else {
                 return;
@@ -51,19 +84,32 @@ pub async fn handle_inbound_packet(ctx: &HandlerCtx, packet: to_motor_controller
                 motor.set_speed(set_speed.speed.as_f32());
             }
         }
-        to_motor_controller::Packet::Ping(ping) => {
-            let pong = Pong { id: ping.id };
-
-            ctx.packets
-                .send(from_motor_controller::Packet::Pong(pong))
-                .await;
+        PacketH2C::Ping(ping) => {
+            let pong = c2h::Pong { id: ping.id };
+            ctx.packets.send(pong.into()).await;
         }
-        to_motor_controller::Packet::SetArmed(set_armed) => match set_armed {
-            to_motor_controller::SetArmed::Armed { duration } => {
+        PacketH2C::SetArmed(set_armed) => match set_armed {
+            h2c::SetArmed::Armed { duration } => {
                 safety_watchdog::feed_safety_watch_dog(duration.as_duration())
             }
-            to_motor_controller::SetArmed::Disarmed => safety_watchdog::disable_motors(),
+            h2c::SetArmed::Disarmed => safety_watchdog::disable_motors(),
         },
+        PacketH2C::ResetToUsbBoot => {
+            embassy_rp::rom_data::reset_to_usb_boot(0, 0);
+        }
+        PacketH2C::ReadProtocolVersion => {
+            ctx.packets
+                .send(
+                    c2h::ProtocolVersionResponse {
+                        version: interface::PROTOCOL_VERSION,
+                    }
+                    .into(),
+                )
+                .await;
+        }
+        PacketH2C::ReadSoftwareData => {
+            ctx.packets.send(c2h::Error::Unimplemented.into()).await;
+        }
     }
 }
 
@@ -95,13 +141,16 @@ async fn send_motor_stream(ctx: &HandlerCtx, motors: Motors) {
         let motor = &mut motor_controllers[motor_id as usize];
 
         ctx.packets
-            .send(from_motor_controller::Packet::MotorState(MotorState {
-                motor_id,
-                last_speed: Speed::from_f32(motor.last_speed()),
-                current_draw: CurrentDraw::from_f32_amps(motor.current_draw()),
-                is_fault: motor.is_fault(),
-                is_enabled: motor.is_armed(),
-            }))
+            .send(
+                c2h::MotorState {
+                    motor_id,
+                    last_speed: Speed::from_f32(motor.last_speed()),
+                    current_draw: CurrentDraw::from_f32_amps(motor.current_draw()),
+                    is_fault: motor.is_fault(),
+                    is_enabled: motor.is_armed(),
+                }
+                .into(),
+            )
             .await;
     }
 }

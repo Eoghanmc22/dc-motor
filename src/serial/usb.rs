@@ -4,13 +4,12 @@ use embassy_rp::peripherals::USB;
 use embassy_rp::usb::Driver;
 use embassy_usb::UsbDevice;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, Receiver, Sender, State};
-use interface::decoder::{FeedResult, PackerDecoder};
+use interface::decoder::PackerDecoder;
 use interface::encoder::encode_packet;
-use interface::from_motor_controller;
 use static_cell::StaticCell;
 
 use crate::Irqs;
-use crate::serial::handler::{self, HandlerCtx, stream_motor_data};
+use crate::serial::handler::{HandlerCtx, feed_all_and_handle, stream_motor_data};
 
 static USB_CTX: HandlerCtx = HandlerCtx::new();
 
@@ -126,41 +125,7 @@ async fn usb_read_half(mut receiver: Receiver<'static, MyUsbDriver>) {
                 break;
             };
 
-            let mut data = &buf[..n];
-
-            while !data.is_empty() {
-                let rst = decoder.feed(data);
-                match rst {
-                    FeedResult::Consumed => {
-                        data = &[];
-                    }
-                    FeedResult::OverFull(remaining) => {
-                        USB_CTX
-                            .packets
-                            .send(from_motor_controller::Packet::Error(
-                                from_motor_controller::Error::DecodingBufferOverflow,
-                            ))
-                            .await;
-                        data = remaining;
-                    }
-                    FeedResult::DeserError(remaining) => {
-                        USB_CTX
-                            .packets
-                            .send(from_motor_controller::Packet::Error(
-                                from_motor_controller::Error::DecodingError,
-                            ))
-                            .await;
-                        data = remaining;
-                    }
-                    FeedResult::Success {
-                        data: packet,
-                        remaining,
-                    } => {
-                        handler::handle_inbound_packet(&USB_CTX, packet).await;
-                        data = remaining;
-                    }
-                }
-            }
+            feed_all_and_handle(&buf[..n], &mut decoder, &USB_CTX).await;
         }
     }
 }
