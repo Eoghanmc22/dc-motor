@@ -34,7 +34,7 @@ impl Drv8874 {
             pwm: Pwm::new_output_a(slice, pwm, Config::default()),
             phase: Output::new(phase.into(), Level::Low),
             enable: Output::new(enable.into(), Level::Low),
-            fault: Input::new(fault.into(), Pull::None),
+            fault: Input::new(fault.into(), Pull::Up),
             armed: false,
             last_speed: 0.0,
         }

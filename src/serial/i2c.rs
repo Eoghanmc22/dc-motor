@@ -110,7 +110,7 @@ async fn handle_message<Out: BufMut>(mut msg: impl Buf, mut response: Out) -> Ou
                     let motor = &mut motor_controllers[motor_id as usize];
 
                     response.put_u8(motor_id as u8);
-                    response.put_i16(Speed::from_f32_pct(motor.last_speed()).0);
+                    response.put_i16(Speed::from_f32(motor.last_speed()).0);
                     response.put_u16(CurrentDraw::from_f32_amps(motor.current_draw()).0);
                     response.put_u8(motor.is_fault() as u8);
                 }

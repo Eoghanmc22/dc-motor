@@ -48,7 +48,7 @@ pub async fn handle_inbound_packet(ctx: &HandlerCtx, packet: to_motor_controller
                 let motor_id = motor_id.bits().trailing_zeros();
                 let motor = &mut motor_controllers[motor_id as usize];
 
-                motor.set_speed(set_speed.speed.as_f32_pct());
+                motor.set_speed(set_speed.speed.as_f32());
             }
         }
         to_motor_controller::Packet::Ping(ping) => {
@@ -97,9 +97,10 @@ async fn send_motor_stream(ctx: &HandlerCtx, motors: Motors) {
         ctx.packets
             .send(from_motor_controller::Packet::MotorState(MotorState {
                 motor_id,
-                last_speed: Speed::from_f32_pct(motor.last_speed()),
+                last_speed: Speed::from_f32(motor.last_speed()),
                 current_draw: CurrentDraw::from_f32_amps(motor.current_draw()),
                 is_fault: motor.is_fault(),
+                is_enabled: motor.is_armed(),
             }))
             .await;
     }
