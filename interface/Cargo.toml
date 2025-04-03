@@ -1,0 +1,42 @@
+[package]
+name = "interface"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = { version = "2.9.0", features = ["serde"] }
+postcard = { version = "1.1.1", features = [
+  "use-crc",
+  "use-defmt",
+  "experimental-derive",
+] }
+cobs = { version = "0.3.0", default-features = false, features = ["defmt"] }
+crc = "3.2.1"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+embassy-time = { version = "0.4", features = [
+  "defmt",
+  "defmt-timestamp-uptime",
+] }
+
+tokio = { version = "1", features = ["full"], optional = true }
+tokio-serial = { version = "5.4", optional = true }
+tokio-util = { version = "0.7", optional = true, features = ["codec"] }
+futures-util = { version = "0.3", optional = true }
+tracing = { version = "0.1", optional = true }
+anyhow = { version = "1", optional = true }
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
+
+[features]
+default = ["std", "implementation_tokio"]
+std = []
+implementation_tokio = [
+  "tokio",
+  "tokio-serial",
+  "tokio-util",
+  "futures-util",
+  "tracing",
+  "anyhow",
+]
