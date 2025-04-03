@@ -28,20 +28,18 @@ pub async fn start_adc_dma(
     pin_29: PIN_29,
 ) {
     let mut adc = Adc::new(adc, Irqs, Config::default());
-    // let mut pins = [
-    //     Channel::new_pin(pin_26, Pull::None),
-    //     Channel::new_pin(pin_27, Pull::None),
-    //     Channel::new_pin(pin_28, Pull::None),
-    //     Channel::new_pin(pin_29, Pull::None),
-    // ];
-
-    // TODO: Gate this order behind feature flag
     let mut pins = [
-        Channel::new_pin(pin_28, Pull::None),
         Channel::new_pin(pin_26, Pull::None),
-        Channel::new_pin(pin_29, Pull::None),
         Channel::new_pin(pin_27, Pull::None),
+        Channel::new_pin(pin_28, Pull::None),
+        Channel::new_pin(pin_29, Pull::None),
     ];
+
+    // mot 0 -> idx 2
+    // mot 1 -> idx 0
+    // mot 2 -> idx 3
+    // mot 3 -> idx 1
+    const PIN_MAP: [u8; 4] = [2, 0, 3, 1];
 
     const NUM_CHANNELS: usize = 4;
     const FREQUENCY: usize = 1000;
@@ -57,7 +55,7 @@ pub async fn start_adc_dma(
             .unwrap();
 
         for (idx, watch) in ADC_WATCHES.iter().enumerate() {
-            let voltage = buf[idx] as f32 / 4095.0 * 3.0;
+            let voltage = buf[PIN_MAP[idx] as usize] as f32 / 4095.0 * 3.0;
             let amperage = voltage / 2.2e3 / 4.5e-4;
 
             watch.sender().send(amperage);
