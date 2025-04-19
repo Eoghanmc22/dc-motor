@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 
 pub const CRC: Crc<u16, Table<1>> = Crc::<u16>::new(&crc::CRC_16_USB);
 
